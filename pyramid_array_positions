@@ -1,0 +1,41 @@
+function pos = pyramid_array_positions(d, p0)
+    % d  = comprimento da aresta
+    % p0 = posição do centro da base [x y z]
+
+    if nargin < 2
+        p0 = [0 0 0];
+    end
+
+    % Coordenadas de um tetraedro regular com centro da base na origem (0,0,0)
+
+    % Base: triângulo equilátero no plano z = 0
+    % Distância do centro à cada vértice da base: R = d / sqrt(3)
+    R = d / sqrt(3);
+
+    % Ângulos dos vértices em torno do centro, no plano xy
+    ang1 = 0;
+    ang2 = 2*pi/3;
+    ang3 = 4*pi/3;
+
+    p1 = [ R*cos(ang1), R*sin(ang1), 0];
+    p2 = [ R*cos(ang2), R*sin(ang2), 0];
+    p3 = [ R*cos(ang3), R*sin(ang3), 0];
+
+    % Altura do tetraedro regular
+    h = sqrt(2/3) * d;
+
+    % Topo alinhado com o centro da base
+    p4 = [0, 0, h];
+
+    % Agora transladamos tudo para que o centro da base seja p0
+    base_center = [0 0 0];   % já está na origem, mas deixo explícito
+    shift = p0 - base_center;
+
+    p1 = p1 + shift;
+    p2 = p2 + shift;
+    p3 = p3 + shift;
+    p4 = p4 + shift;
+
+    % Saída como matriz 4x3 (hidrofone x [x y z])
+    pos = [p1; p2; p3; p4];
+end
