@@ -1,0 +1,198 @@
+clc; clear; close all;
+
+%% ------------------------------------------------------------------------
+%  PARÂMETROS BÁSICOS
+% -------------------------------------------------------------------------
+c  = 1500;   % velocidade do som na água [m/s]
+
+% Definir array (ajuste para o seu caso real)
+d  = 1;                % parâmetro de espaçamento
+p0 = [0 0 0];          % posição de referência do array
+pos = pyramid_array_positions(d, p0);   % N x 3
+N   = size(pos, 1);    % número de hidrofones
+
+%% ------------------------------------------------------------------------
+%  DIREÇÃO DA FONTE E POSIÇÃO "VERDADEIRA"
+% -------------------------------------------------------------------------
+% Azimute: 0° = eixo x, 90° = eixo y
+% Elevação: 0° = plano xy, 90° = vindo de cima
+az_deg = 45;   % direção da fonte em relação ao array
+el_deg = 30;
+az = deg2rad(az_deg);
+el = deg2rad(el_deg);
+
+% Vetor unitário DE (array) PARA a fonte
+k_dir = [cos(el)*cos(az);
+         cos(el)*sin(az);
+         sin(el)];        % 3x1
+k_dir = k_dir / norm(k_dir);
+
+% Centro geométrico do array
+array_center = mean(pos, 1);   % 1x3
+
+% Distância verdadeira da fonte
+R_true = 5000;   % [m]  <<--- FONTE A 5000 m
+
+% Posição verdadeira da fonte
+s_true = array_center + R_true * k_dir.';   % 1x3
+
+%% ------------------------------------------------------------------------
+%  GERAR ATRASOS TEÓRICOS (TAU) PARA ESSA FONTE VERDADEIRA
+% -------------------------------------------------------------------------
+% Função para calcular tempos absolutos (distância / c)
+calc_tau = @(s) vecnorm(bsxfun(@minus, pos, s), 2, 2) / c;   % N x 1
+
+% Tempos absolutos até cada hidrofone
+tau_abs_true = calc_tau(s_true);   % N x 1
+
+% Atrasos relativos (em relação ao menor tempo)
+tau = tau_abs_true - min(tau_abs_true);   % N x 1
+tau = tau(:);   % garantir coluna
+
+%% ------------------------------------------------------------------------
+%  DEFINIR RAIO DE BUSCA (MÍNIMO E MÁXIMO) E SETOR DE 90°
+% -------------------------------------------------------------------------
+R_min = 4000;    % [m] raio mínimo de busca
+R_max = 7000;    % [m] raio máximo de busca
+
+% Limites de caixa (cubo grande o suficiente para conter esse anel)
+lb = array_center - [R_max R_max R_max];
+ub = array_center + [R_max R_max R_max];
+
+% Setor de 90° em torno da direção k_dir
+half_angle_deg = 45;              % meio-ângulo da abertura
+cos_half = cosd(half_angle_deg);  % cos(45°)
+
+axis_dir = k_dir;                 % eixo do setor (do array para a fonte)
+
+%% ------------------------------------------------------------------------
+%  FUNÇÃO DE CUSTO COM PENALIZAÇÃO DE SETOR E RAIO (ANEL: R_min–R_max)
+% -------------------------------------------------------------------------
+% Custo base: erro de TDOA
+base_cost = @(s) sum( ( (calc_tau(s) - min(calc_tau(s))) - tau ).^2 );
+
+% Penalização de raio:
+%  - se norm(s - array_center) < R_min  -> penaliza
+%  - se norm(s - array_center) > R_max  -> penaliza
+pen_radius = @(s) ...
+    max(0, R_min - norm(s - array_center)) + ...
+    max(0, norm(s - array_center) - R_max);
+
+% Penalização angular (setor de 90°):
+%  - Vetor direção da fonte: (s - array_center)
+%  - Ângulo entre direção e axis_dir deve ser <= half_angle_deg
+pen_angle = @(s) ...
+    ( norm(s - array_center) > 0 ) .* ...
+    max( 0, cos_half - dot( (s - array_center)/norm(s - array_center), axis_dir ) );
+
+% Pesos das penalizações (ajuste se quiser forçar mais/menos)
+lambda_r = 1e-8;    % penalização de raio
+lambda_a = 1e-4;    % penalização angular
+
+cost_fun = @(s) base_cost(s) + ...
+                lambda_r * pen_radius(s)^2 + ...
+                lambda_a * pen_angle(s)^2;
+
+%% ------------------------------------------------------------------------
+%  OTIMIZAÇÃO: ESTIMAR POSIÇÃO 3D DA FONTE
+% -------------------------------------------------------------------------
+% Chute inicial: dentro do anel, na direção correta
+R0 = 4500;   % [m] chute inicial de raio (entre 4k e 7k)
+s0 = array_center + R0 * axis_dir.';   % 1x3
+
+opts = optimoptions('fmincon', ...
+    'Display','iter', ...
+    'Algorithm','interior-point', ...
+    'TolX',1e-8, ...
+    'TolFun',1e-12);
+
+[s_est, fval] = fmincon(cost_fun, s0, [], [], [], [], lb, ub, [], opts);
+
+%% ------------------------------------------------------------------------
+%  COMPARAÇÃO REAL x ESTIMADO
+% -------------------------------------------------------------------------
+fprintf('Posição VERDADEIRA da fonte (x,y,z) [m]:\n');
+disp(s_true);
+fprintf('Posição ESTIMADA da fonte (x,y,z) [m]:\n');
+disp(s_est);
+erro = norm(s_est - s_true);
+fprintf('Erro de localização (norma Euclidiana): %.4f m\n', erro);
+fprintf('Erro quadrático final da função de custo: %.3e\n', fval);
+
+tau_abs_est = calc_tau(s_est);
+tau_est      = tau_abs_est - min(tau_abs_est);
+disp('tau (atrasos verdadeiros) [s]:');
+disp(tau);
+disp('tau_est (atrasos previstos pela posição estimada) [s]:');
+disp(tau_est);
+
+%% ------------------------------------------------------------------------
+%  PLOT 3D: ARRAY, FONTE VERDADEIRA, FONTE ESTIMADA, SETOR E ÁREA DE BUSCA
+% -------------------------------------------------------------------------
+figure; hold on; grid on; axis equal;
+xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+title('Array, setor de busca (90°) e área de busca [4 km, 7 km]');
+
+% ------------------- PLOT DO SETOR (CONE TRUNCADO ENTRE R_min e R_max) ---
+alpha = deg2rad(half_angle_deg);   % meio-ângulo em rad
+
+% Eixo do cone aponta de array_center para a fonte (axis_dir)
+u = axis_dir;     % 3x1
+
+% Gerar vetores ortogonais v, w para formar base ortonormal
+ref = [0 0 1].';
+if abs(dot(u, ref)) > 0.9
+    ref = [0 1 0].';
+end
+v = cross(u, ref); v = v / norm(v);
+w = cross(u, v);   % já normal
+
+% Malha ao longo do cone entre R_min e R_max
+nr = 20; nphi = 40;
+r_vals  = linspace(R_min, R_max, nr);
+phi_vals = linspace(0, 2*pi, nphi);
+[Rr, Pphi] = meshgrid(r_vals, phi_vals);
+
+% Ponto na superfície do cone
+Xc = array_center(1) + ...
+     Rr .* ( cos(alpha)*u(1) + sin(alpha)*(cos(Pphi)*v(1) + sin(Pphi)*w(1)) );
+Yc = array_center(2) + ...
+     Rr .* ( cos(alpha)*u(2) + sin(alpha)*(cos(Pphi)*v(2) + sin(Pphi)*w(2)) );
+Zc = array_center(3) + ...
+     Rr .* ( cos(alpha)*u(3) + sin(alpha)*(cos(Pphi)*v(3) + sin(Pphi)*w(3)) );
+
+% Superfície do cone truncado (área de busca)
+surf(Xc, Yc, Zc, ...
+    'FaceAlpha', 0.15, ...           % transparência
+    'EdgeColor', 'none', ...
+    'FaceColor', [0.3 0.7 1.0]);     % azul claro
+
+% Circunferência inferior (em R_min) e superior (em R_max)
+plot3(Xc(1,:), Yc(1,:), Zc(1,:), 'b-', 'LineWidth', 1.0);       % em R_min
+plot3(Xc(end,:), Yc(end,:), Zc(end,:), 'b--', 'LineWidth', 1.0);% em R_max
+
+% ------------------- PLOT DO ARRAY E FONTES -----------------------------
+% Hidrofones
+plot3(pos(:,1), pos(:,2), pos(:,3), 'ko', 'MarkerSize', 6, ...
+      'MarkerFaceColor','k', 'DisplayName','Hidrofones');
+
+% Fonte verdadeira
+plot3(s_true(1), s_true(2), s_true(3), 'gp', 'MarkerSize', 14, ...
+      'MarkerFaceColor','g', 'DisplayName','Fonte verdadeira');
+text(s_true(1), s_true(2), s_true(3), '  Verdadeira', ...
+     'Color','g', 'FontSize', 10);
+
+% Fonte estimada
+plot3(s_est(1), s_est(2), s_est(3), 'rp', 'MarkerSize', 14, ...
+      'MarkerFaceColor','r', 'DisplayName','Fonte estimada');
+text(s_est(1), s_est(2), s_est(3), '  Estimada', ...
+     'Color','r', 'FontSize', 10);
+
+% Linhas da fonte estimada para cada hidrofone
+for i = 1:N
+    plot3([pos(i,1) s_est(1)], [pos(i,2) s_est(2)], [pos(i,3) s_est(3)], ...
+          'k--', 'LineWidth', 0.5);
+end
+
+legend('Location','best');
+view(3);
