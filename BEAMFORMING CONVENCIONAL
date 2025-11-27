@@ -1,0 +1,101 @@
+% =========================================================================
+% BEAMFORMING CONVENCIONAL - ARRAY PIRAMIDAL (4 HIDROFONES)
+% =========================================================================
+clear all, close all
+% -------------------------------------------------------------------------
+% 1. PARÂMETROS DO MEIO E DA FONTE
+% -------------------------------------------------------------------------
+c = 1500;           % Velocidade do som na água [m/s]
+freq = 500;         % Frequência do sinal [Hz]
+w0 = 2*pi*freq;     % Frequência angular [rad/s]
+% Direção real da fonte (coordenadas esféricas)
+thetas  = 40;                   % Elevação da fonte [graus]
+phis    = 20;                   % Azimute da fonte [graus]
+thetasr = thetas*pi/180;        % rad
+phisr   = phis*pi/180;          % rad
+% -------------------------------------------------------------------------
+% 2. GEOMETRIA PIRAMIDAL DOS 4 HIDROFONES
+% -------------------------------------------------------------------------
+L = 1.0;    % Lado da base [m]
+H = 1.0;    % Altura da pirâmide [m]
+% Base em z = 0, triângulo equilátero centrado na origem
+r1 = [ 0            , -L/sqrt(3), 0];      % Hidrofone 1
+r2 = [ L/2         ,  L/(2*sqrt(3)), 0];   % Hidrofone 2
+r3 = [-L/2         ,  L/(2*sqrt(3)), 0];   % Hidrofone 3
+% Topo em z = H
+r4 = [0, 0, H];                            % Hidrofone 4
+% Matriz de posições (cada linha = [x, y, z] de um hidrofone)
+r = [r1;
+     r2;
+     r3;
+     r4];
+nsensors = size(r,1);  % número de hidrofones (= 4)
+% -------------------------------------------------------------------------
+% 3. GRID DE BUSCA ANGULAR
+% -------------------------------------------------------------------------
+ntheta = 182;
+theta  = linspace( 0, 90, ntheta);
+thetar = theta*pi/180;
+nphi = 362;
+phi  = linspace(-90, 90, nphi);
+phir = phi*pi/180;
+% -------------------------------------------------------------------------
+% 4. STEERING VECTOR DA FONTE REAL (yp)
+% -------------------------------------------------------------------------
+% Vetor de onda da fonte real
+kx_source = cos(phisr)*cos(thetasr);
+ky_source = sin(phisr)*cos(thetasr);
+kz_source =           sin(thetasr);
+ks = (w0/c)*[kx_source, ky_source, kz_source];
+yp = zeros(1, nsensors) + 1i;
+for l = 1:nsensors
+    rl = r(l,:);                        % posição do hidrofone l (1x3)
+    yp(l) = exp(-1i * dot(ks, rl));     % MESMO SINAL (-) para fonte e busca
+end
+yp = yp / norm(yp);                     % normalização
+% -------------------------------------------------------------------------
+% 5. VARREDURA ANGULAR E CÁLCULO DO BEAM PATTERN
+% -------------------------------------------------------------------------
+B  = zeros(ntheta, nphi);
+ep = zeros(1, nsensors) + 1i;
+for j = 1:nphi
+    phij = phir(j);
+    for i = 1:ntheta
+        thetai = thetar(i);
+        % Vetor de onda para a direção de busca (theta_i, phi_j)
+        kx = cos(phij)*cos(thetai);
+        ky = sin(phij)*cos(thetai);
+        kz =           sin(thetai);
+        k  = (w0/c)*[kx, ky, kz];
+        % Steering vector para a direção de busca
+        for l = 1:nsensors
+            rl = r(l,:);
+            ep(l) = exp(-1i * dot(k, rl));   % MESMO SINAL (-) que yp
+        end
+        ep = ep / norm(ep);
+        % Beam pattern
+        B(i,j) = abs(dot(yp, ep));
+    end
+end
+% -------------------------------------------------------------------------
+% 6. PLOT DO BEAM PATTERN
+% -------------------------------------------------------------------------
+figure(1)
+colormap('jet')
+pcolor(phi, theta, B), shading interp, colorbar
+xlim([-90, 90])
+ylim([ 0, 90])
+xlabel('\phi (graus)',  'FontSize', 18)
+ylabel('\theta (graus)','FontSize', 18)
+title(sprintf('Array Piramidal (4 hidrofones) - Fonte em (\\theta=%d°, \\phi=%d°)', ...
+      thetas, phis), 'FontSize', 16)
+hold on
+plot(phis, thetas, 'wo', 'MarkerSize', 10, 'LineWidth', 1.5)
+plot(phis, thetas, 'wx', 'MarkerSize', 10, 'LineWidth', 1.5)
+hold off
+
+% -------------------------------------------------------------------------
+% 7. PLOT DA GEOMETRIA 3D DO ARRAY + DOA
+% -------------------------------------------------------------------------
+figure(2)
+plot_array_geometry_3D(r, thetas, phis, 5);
