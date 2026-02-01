@@ -7,7 +7,7 @@ c = 1500;
 dur_s = 80e-3;
 t = (0:round(dur_s*fs)-1)'/fs;
 
-SNR_dB = 0;
+SNR_dB = -10;
 
 % Geometria
 fmax_geom = 850;
@@ -18,10 +18,8 @@ lambda_min = c / fmax_geom;
 % Picos do sinal em 400 e 800Hz
 
 L = 0.5 * lambda_min;
-% Largura limite de lambida/2
-H = L;
 
-pos_h = pyramid_array_positions(L, H);
+pos_h = pyramid_array_positions(L);
 
 % Fonte simulada
 az_real = 35;
@@ -60,18 +58,6 @@ s = s .* hann(length(s));
 s = s - mean(s);
 % Remove o médio do sinal, elimininando a componente de DC 
 % Melhora a correlação e evita enviesamento do pico
-
-%% Sinal chirp usado no primeiro teste
-
-% s = chirp(t, 300, t(end), 1200, 'linear');
-% % Cria um sinal do tipo chirp 300 a 1200Hz
-% 
-% s = s .* hann(length(s));
-% % Aplica uma janela de Hann ao sinal
-% 
-% s = s - mean(s);
-% % Remove o médio do sinal, elimininando a componente de DC 
-% % Melhora a correlação e evita enviesamento do pico
 
 %% 4) Simular captacao nos 4 hidrofones com atrasos relativos
 N = length(s);
@@ -273,33 +259,102 @@ lg = legend([hR hE], {sprintf('Real az %.2f el %.2f', az_real_w, el_real), sprin
 set(lg,'Color','w','EdgeColor','k');
 hold off
 
+%% Plot 3D da geometria do arranjo piramidal
+figure('Position', [100 100 900 700], 'Color', 'w');
+hold on; grid on; axis equal;
+
+% Calcular altura do tetraedro (apenas para uso interno no plot)
+H_calc = L * sqrt(2/3);
+
+% Plotar os 4 hidrofones
+scatter3(pos_h(:,1), pos_h(:,2), pos_h(:,3), 150, 'filled', 'MarkerFaceColor', [0 0.4470 0.7410], 'MarkerEdgeColor', 'k', 'LineWidth', 1.5);
+
+% Rotular cada hidrofone
+for k = 1:4
+    text(pos_h(k,1), pos_h(k,2), pos_h(k,3) + 0.05, sprintf('  H%d', k), ...
+        'FontSize', 12, 'FontWeight', 'bold', 'Color', 'k', 'Interpreter', 'latex');
+end
+
+% Desenhar as arestas da base (triângulo equilátero)
+base_idx = [1 2; 2 3; 3 1];
+for i = 1:size(base_idx, 1)
+    p1 = pos_h(base_idx(i,1), :);
+    p2 = pos_h(base_idx(i,2), :);
+    plot3([p1(1) p2(1)], [p1(2) p2(2)], [p1(3) p2(3)], 'k-', 'LineWidth', 1.5);
+end
+
+% Desenhar as arestas da pirâmide (do ápice para a base)
+apex_idx = [1 4; 2 4; 3 4];
+for i = 1:size(apex_idx, 1)
+    p1 = pos_h(apex_idx(i,1), :);
+    p2 = pos_h(apex_idx(i,2), :);
+    plot3([p1(1) p2(1)], [p1(2) p2(2)], [p1(3) p2(3)], 'b--', 'LineWidth', 1.2);
+end
+
+% Adicionar anotações de distâncias importantes
+% Lado da base
+mid_12 = (pos_h(1,:) + pos_h(2,:))/2;
+text(mid_12(1), mid_12(2), mid_12(3) - 0.05, sprintf('$L = %.3f$ m', L), ...
+    'FontSize', 10, 'Color', 'k', 'Interpreter', 'latex');
+
+% Comprimento de onda mínimo
+text(0.1, 0.1, 0.05, sprintf('$\\lambda_{\\mathrm{min}}/2 = %.3f$ m', lambda_min/2), ...
+    'FontSize', 10, 'Color', 'b', 'Interpreter', 'latex');
+
+% Distância máxima entre pares
+text(0.1, 0.1, H_calc + 0.15, sprintf('$d_{\\mathrm{max}} = %.3f$ m', dmax), ...
+    'FontSize', 11, 'Color', [0 0.5 0], 'Interpreter', 'latex', 'FontWeight', 'bold');
+
+% Configurações dos eixos
+xlabel('$x$ (m)', 'Interpreter', 'latex', 'FontSize', 12);
+ylabel('$y$ (m)', 'Interpreter', 'latex', 'FontSize', 12);
+zlabel('$z$ (m)', 'Interpreter', 'latex', 'FontSize', 12);
+title(sprintf('Geometria do arranjo piramidal ($L = %.3f$ m, $\\lambda_{\\mathrm{min}}/2 = %.3f$ m)', L, lambda_min/2), ...
+    'Interpreter', 'latex', 'FontSize', 13);
+
+% Ajustar visualização
+view(45, 30);  % Ângulo de visão 3D
+xlim([-0.1 L+0.1]);
+ylim([-0.1 L*sqrt(3)/2 + 0.1]);
+zlim([0 H_calc + 0.2]);
+set(gca, 'FontSize', 10);
+box on;
+
+% Adicionar legenda
+legend({'Hidrofones', 'Arestas da base', 'Arestas da piramide'}, ...
+    'Location', 'best', 'Interpreter', 'latex', 'FontSize', 10);
+
+hold off;
 
 
 %% ========================================================================
 %  Funcoes
 
-function pos = pyramid_array_positions(L, H)
-% Retorna as coordenadas 3D de um arranjo piramidal com 4 hidrofones, dado o lado L e a altura H.
+function pos = pyramid_array_positions(L)
+% Returns the 3D coordinates of a regular tetrahedral array
+% with 4 hydrophones, given the base side L.
+%
+% H1: origin
+% H2, H3: equilateral triangle in the xy-plane
+% H4: apex above the centroid of the base, forming a regular tetrahedron.
 
+    % Base triangle (equilateral) in the xy-plane
     pos = zeros(4,3);
-% Prealoca a matriz 4x3 que armazena as posicoes cartesianas de cada hidrofone.
+    pos(1,:) = [0,   0,              0];               % H1
+    pos(2,:) = [L,   0,              0];               % H2
+    pos(3,:) = [L/2, L*sqrt(3)/2,    0];               % H3
 
-    pos(1,:) = [0, 0, 0];
-% Define o hidrofone 1 na origem do sistema de coordenadas.
+    % Centroid of the base triangle
+    cx = L/2;
+    cy = L*sqrt(3)/6;
 
-    pos(2,:) = [L, 0, 0];
-% Define o hidrofone 2 no eixo x, a uma distancia L do hidrofone 1.
+    % Height for a regular tetrahedron (all edges = L)
+    H_tet = L * sqrt(2/3);
 
-    pos(3,:) = [L/2, L*sqrt(3)/2, 0];
-% Define o hidrofone 3 no plano z igual a zero, formando triangulo equilatero com lado L.
-
-    cx = L/2; cy = L*sqrt(3)/6;
-% Calcula as coordenadas do centroide do triangulo equilatero da base.
-
-    pos(4,:) = [cx, cy, H];
-% Define o hidrofone 4 no apice da piramide, acima do centroide, com altura H.
-
+    % Apex (H4) above the centroid
+    pos(4,:) = [cx, cy, H_tet];
 end
+
 
 function pos = sph2cart_deg(r, az_deg, el_deg)
 % Converte coordenadas esfericas em graus para coordenadas cartesianas 3D.
