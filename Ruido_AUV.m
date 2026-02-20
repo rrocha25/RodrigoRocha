@@ -1,8 +1,13 @@
     % =========================================================================
-%% S√çNTESE DE √ÅUDIO A PARTIR DO ESPECTRO DO CSV (N√çVEL DE SPL EXATO)
+%% SÕNTESE DE ¡UDIO A PARTIR DO ESPECTRO DO CSV (NÕVEL DE SPL EXATO)
 % =========================================================================
 clear; clc; close all;
 
+% Output directory for figures
+outputDir = './figures';
+if ~exist(outputDir, 'dir')
+    mkdir(outputDir);
+end
 % -------------------------------------------------------------------------
 %% 1. IMPORTAR CSV
 % -------------------------------------------------------------------------
@@ -14,10 +19,10 @@ SPL = dados.data(:,2);
 SPL = SPL(idx);
 
 % -------------------------------------------------------------------------
-%% 2. SPL ? Press√£o (Pa)
+%% 2. SPL ? Press„o (Pa)
 % -------------------------------------------------------------------------
-p_ref = 1e-6; %Press√£o de refer√™ncia padr√£o em √°gua = 1 ¬µPa
-P = p_ref * 10.^(SPL/20); %Vetor P com amplitudes de press√£o em Pa para cada frequ√™ncia
+p_ref = 1e-6; %Press„o de referÍncia padr„o em ·gua = 1 µPa
+P = p_ref * 10.^(SPL/20); %Vetor P com amplitudes de press„o em Pa para cada frequÍncia
 
 % -------------------------------------------------------------------------
 %% 3. GRID UNIFORME PARA IFFT
@@ -26,50 +31,50 @@ fs = 44100;
 dur = 60;
 N = fs * dur;
 f_ifft = linspace(0, fs/2, floor(N/2)+1)'; 
-% A IFFT requer frequ√™ncias igualmente espa√ßadas
+% A IFFT requer frequÍncias igualmente espaÁadas
 
 P_interp = interp1(freq, P, f_ifft, 'linear', 'extrap');
 P_interp(P_interp<0) = 0; 
-% Atribui zero: Press√£o n√£o pode ser negativa
+% Atribui zero: Press„o n„o pode ser negativa
 
 % -------------------------------------------------------------------------
-%% 4. CONSTRU√á√ÉO DO ESPECTRO COMPLEXO
+%% 4. CONSTRU«√O DO ESPECTRO COMPLEXO
 % -------------------------------------------------------------------------
 fase = 2*pi*rand(size(P_interp));
-%Cria fases aleat√≥rias para cada componente de frequ√™ncia (em radianos)
-% Fases aleat√≥rias uniformes geram ru√≠do realista com espectro controlado
-% Garante propriedades estat√≠sticas adequadas para simular ru√≠do ambiente
+%Cria fases aleatÛrias para cada componente de frequÍncia (em radianos)
+% Fases aleatÛrias uniformes geram ruÌdo realista com espectro controlado
+% Garante propriedades estatÌsticas adequadas para simular ruÌdo ambiente
 
 S = P_interp .* exp(1i*fase); 
-% Vetor complexo com: Magnitude: P_interp (press√£o em Pa), Fase: fase (aleat√≥ria)
+% Vetor complexo com: Magnitude: P_interp (press„o em Pa), Fase: fase (aleatÛria)
 
 S_full = [S ; conj(S(end-1:-1:2))];
-% Inverte o vetor S, excluindo primeiro (DC) e √∫ltimo (Nyquist) elementos
-% Calcula o conjugado complexo (inverte o sinal da parte imagin√°ria)
+% Inverte o vetor S, excluindo primeiro (DC) e ˙ltimo (Nyquist) elementos
+% Calcula o conjugado complexo (inverte o sinal da parte imagin·ria)
 % Concatena verticalmente
 
 % -------------------------------------------------------------------------
 %% 5. IFFT ? SINAL TEMPORAL
 % -------------------------------------------------------------------------
 x = real(ifft(S_full,'symmetric'));
-x = x(1:N); % Garante exatamente 60 segundos de √°udio
+x = x(1:N); % Garante exatamente 60 segundos de ·udio
 
 % -------------------------------------------------------------------------
-%% 6. AJUSTE ABSOLUTO: √ÅUDIO FICA COM O MESMO SPL DO CSV
+%% 6. AJUSTE ABSOLUTO: ¡UDIO FICA COM O MESMO SPL DO CSV
 % -------------------------------------------------------------------------
-energia_espectro = mean(P_interp.^2);  % Pot√™ncia ac√∫stica m√©dia por unidade de √°rea 
+energia_espectro = mean(P_interp.^2);  % PotÍncia ac˙stica mÈdia por unidade de ·rea 
 
 energia_audio = mean(x.^2);
-% Energia m√©dia do sinal temporal em Pa¬≤
+% Energia mÈdia do sinal temporal em Pa≤
 
 ganho = sqrt(energia_espectro / energia_audio);
-% Raiz da Raz√£o entre energias (adimensional)para converter de energia (pot√™ncia) para amplitude
+% Raiz da Raz„o entre energias (adimensional)para converter de energia (potÍncia) para amplitude
 
 x = x * ganho;
-% Ajusta o n√≠vel absoluto para corresponder aos valores SPL do CSV
+% Ajusta o nÌvel absoluto para corresponder aos valores SPL do CSV
 
 % -------------------------------------------------------------------------
-%% 7. SALVAR √ÅUDIO (SINAL PURO)
+%% 7. SALVAR ¡UDIO (SINAL PURO)
 % -------------------------------------------------------------------------
 audiowrite('auv_chen_exato.wav', x, fs);
 
@@ -78,44 +83,44 @@ audiowrite('auv_chen_exato.wav', x, fs);
 % -------------------------------------------------------------------------
 Y = fft(x);
 f_fft_all = (0:N-1)' * fs / N;
-% Cria√ß√£o do Vetor de Frequ√™ncias Completo
+% CriaÁ„o do Vetor de FrequÍncias Completo
 
 f_fft_pos = f_fft_all(1:floor(N/2)+1);
-% Extra√ß√£o das Frequ√™ncias Positivas
+% ExtraÁ„o das FrequÍncias Positivas
 
 PSD_sinal = (abs(Y(1:floor(N/2)+1)).^2) / N;
-% C√°lculo da Densidade Espectral de Pot√™ncia (PSD)
+% C·lculo da Densidade Espectral de PotÍncia (PSD)
 
 PSD_sinal(2:end-1) = 2 * PSD_sinal(2:end-1);
-% Corre√ß√£o para Espectro Unilateral
-% (2*) porque estamos descartando as frequ√™ncias negativas
-% Exce√ß√µes:
-%   DC (√≠ndice 1): N√£o multiplica (n√£o tem par negativo)
-%   Nyquist (end): N√£o multiplica (√© √∫nico, n√£o tem par)
+% CorreÁ„o para Espectro Unilateral
+% (2*) porque estamos descartando as frequÍncias negativas
+% ExceÁıes:
+%   DC (Ìndice 1): N„o multiplica (n„o tem par negativo)
+%   Nyquist (end): N„o multiplica (È ˙nico, n„o tem par)
 % Resultado: PSD unilateral com energia total preservada
 
 SPL_sinal = 10 * log10(PSD_sinal / (p_ref^2) + eps);
-%  Convers√£o PSD ? SPL
+%  Convers„o PSD ? SPL
 
 % -------------------------------------------------------------------------
-%% 9. CARREGAR RU√çDO DE FUNDO
+%% 9. CARREGAR RUÕDO DE FUNDO
 % -------------------------------------------------------------------------
 [ruido, fs_ruido] = audioread('Enseada dos Anjos.wav');
 
 if size(ruido, 2) > 1
     ruido = ruido(:, 1);
 end
-% Convers√£o para Mono
+% Convers„o para Mono
 
 if fs_ruido ~= fs
     ruido = resample(ruido, fs, fs_ruido);
 end
-% Reamostragem pois a taxa de amostragem do ru√≠do difere de 44100 Hz
+% Reamostragem pois a taxa de amostragem do ruÌdo difere de 44100 Hz
 
 if length(ruido) < N
     ruido = repmat(ruido, ceil(N/length(ruido)), 1);
 end
-%  Extens√£o do Ru√≠do para 60s 
+%  Extens„o do RuÌdo para 60s 
 
 ruido = ruido(1:N);
 % Garante: Exatamente N amostras (60 segundos)
@@ -128,7 +133,7 @@ SNR_desejada_dB = 20;
 potencia_sinal = mean(x.^2);
 potencia_ruido = mean(ruido.^2);
 ganho_ruido = sqrt(potencia_sinal / (potencia_ruido * 10^(SNR_desejada_dB/10)));
-%  Calcula ganho necess√°rio para escalar o ru√≠do at√© atingir a SNR desejada
+%  Calcula ganho necess·rio para escalar o ruÌdo atÈ atingir a SNR desejada
 
 ruido = ruido * ganho_ruido;
 
@@ -136,13 +141,13 @@ SNR_final = 10*log10(potencia_sinal / mean(ruido.^2));
 % Verifica a SNR final obtida
 
 % -------------------------------------------------------------------------
-%% 11. COMBINAR SINAL + RU√çDO
+%% 11. COMBINAR SINAL + RUÕDO
 % -------------------------------------------------------------------------
 sinal_com_ruido = x + ruido;
 audiowrite('auv_chen_com_ruido.wav', sinal_com_ruido, fs);
 
 % -------------------------------------------------------------------------
-%% 12. CALCULAR ESPECTRO DO RU√çDO
+%% 12. CALCULAR ESPECTRO DO RUÕDO
 % -------------------------------------------------------------------------
 Y_ruido = fft(ruido);
 PSD_ruido = (abs(Y_ruido(1:floor(N/2)+1)).^2) / N;
@@ -150,7 +155,7 @@ PSD_ruido(2:end-1) = 2 * PSD_ruido(2:end-1);
 SPL_ruido = 10 * log10(PSD_ruido / (p_ref^2) + eps);
 
 % -------------------------------------------------------------------------
-%% 13. CALCULAR ESPECTRO DO SINAL COM RU√çDO
+%% 13. CALCULAR ESPECTRO DO SINAL COM RUÕDO
 % -------------------------------------------------------------------------
 Y_total = fft(sinal_com_ruido);
 PSD_total = (abs(Y_total(1:floor(N/2)+1)).^2) / N;
@@ -176,7 +181,7 @@ subplot(3, 1, 2)
 plot(f_fft_pos(idx_zoom), SPL_ruido(idx_zoom), 'r-', 'LineWidth', 1.5)
 grid on
 ylabel('SPL [dB re 1 \muPa]', 'FontSize', 12, 'FontWeight', 'bold')
-title('Espectro do Ru√≠do de Fundo (Enseada dos Anjos)', 'FontSize', 14, 'FontWeight', 'bold')
+title('Espectro do RuÌdo de Fundo (Enseada dos Anjos)', 'FontSize', 14, 'FontWeight', 'bold')
 xlim([0 1000])
 ylim([0 100])
 set(gca, 'XTickLabel', [])
@@ -184,107 +189,176 @@ set(gca, 'XTickLabel', [])
 subplot(3, 1, 3)
 plot(f_fft_pos(idx_zoom), SPL_total(idx_zoom), 'k-', 'LineWidth', 1.5)
 grid on
-xlabel('Frequ√™ncia [Hz]', 'FontSize', 12, 'FontWeight', 'bold')
+xlabel('FrequÍncia [Hz]', 'FontSize', 12, 'FontWeight', 'bold')
 ylabel('SPL [dB re 1 \muPa]', 'FontSize', 12, 'FontWeight', 'bold')
-title(sprintf('Espectro do Sinal com Ru√≠do (SNR = %.1f dB)', SNR_final), 'FontSize', 14, 'FontWeight', 'bold')
+title(sprintf('Espectro do Sinal com RuÌdo (SNR = %.1f dB)', SNR_final), 'FontSize', 14, 'FontWeight', 'bold')
 xlim([0 1000])
 ylim([0 100])
 
-%% 15 - Espectro + Espectrograma do Sinal AUV e Ru√≠do
-figure('Position', [100 100 1600 1000], 'Color', 'w')
+%% 15 - Espectro + Espectrograma do Sinal AUV e RuÌdo (figuras separadas 2:1)
 
-% Definir margens e gaps
-left_margin   = 0.06;
-right_margin  = 0.02;
-top_margin    = 0.05;
-bottom_margin = 0.06;
-vertical_gap  = 0.06;
-horizontal_gap = 0.08;
+% Par‚metros para espectrograma
+window_length = round(0.025 * fs);      % 25 ms
+overlap       = round(0.75 * window_length);  % 75% overlap
+nfft          = 2^nextpow2(window_length * 4);
 
-% Dimens√µes dos subplots
-plot_width  = (1 - left_margin - right_margin - horizontal_gap) / 2;
-plot_height = (1 - top_margin - bottom_margin - vertical_gap) / 2;
-
-% √çndice de zoom para espectro (at√© 1 kHz)
+% Õndice de zoom para espectro (atÈ 1 kHz)
 idx_zoom = f_fft_pos <= 1000;
 
-% Par√¢metros para espectrograma (baseado na literatura consultada)
-window_length = round(0.025 * fs);  % 25 ms (compromisso tempo-frequ√™ncia)
-overlap = round(0.75 * window_length);  % 75% overlap (padr√£o para boa resolu√ß√£o)
-nfft = 2^nextpow2(window_length * 4);  % Zero-padding para melhor resolu√ß√£o espectral
+% Dimens„o comum 2:1 (largura ~ 2 * altura)
+fig_width  = 1000;
+fig_height = 500;
 
-% ========== COLUNA ESQUERDA: SINAL AUV ==========
+% (a) Espectro do Sinal AUV
+fig = figure('Position', [100 100 1200 600], 'Color', 'w');
 
-% --- Subplot 1: Espectro do Sinal AUV ---
-ax1 = axes('Position', [left_margin, ...
-                        bottom_margin + plot_height + vertical_gap, ...
-                        plot_width, ...
-                        plot_height]);
-plot(f_fft_pos(idx_zoom), SPL_sinal(idx_zoom), 'Color', [0 0.4470 0.7410], 'LineWidth', 1.5)
+plot(f_fft_pos(idx_zoom), SPL_sinal(idx_zoom), ...
+     'Color', [0 0.4470 0.7410], 'LineWidth', 1.5);
 grid on
-ylabel('SPL [dB re 1 \muPa]', 'FontSize', 11, 'FontWeight', 'bold')
-title('AUV-like Signal Spectrum', 'FontSize', 13, 'FontWeight', 'bold')
-xlim([0 1000])
-ylim([0 100])
-set(gca, 'XTickLabel', [], 'FontSize', 10)
+xlabel('Frequency [Hz]', 'FontSize', 20, 'FontWeight', 'bold');
+ylabel('SPL [dB re 1 \muPa]', 'FontSize', 20, 'FontWeight', 'bold');
+xlim([0 1000]);
+ylim([0 100]);
+set(gca, 'FontSize', 20);
+set(gca, 'Position', [0.08 0.18 0.88 0.77]);
 
-% --- Subplot 3: Espectrograma do Sinal AUV ---
-ax3 = axes('Position', [left_margin, ...
-                        bottom_margin, ...
-                        plot_width, ...
-                        plot_height]);
+print(fullfile(outputDir, 'auv_spectrum.eps'), '-depsc');
+%close(fig);
+%%
+% (b) Espectro do RuÌdo
+fig = figure('Position', [100 100 1200 600], 'Color', 'w');
+
+plot(f_fft_pos(idx_zoom), SPL_ruido(idx_zoom), ...
+     'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5);
+grid on
+xlabel('Frequency [Hz]', 'FontSize', 20, 'FontWeight', 'bold');
+ylabel('SPL [dB re 1 \muPa]', 'FontSize', 20, 'FontWeight', 'bold');
+xlim([0 1000]);
+ylim([0 100]);
+set(gca, 'FontSize', 20);
+set(gca, 'Position', [0.08 0.18 0.88 0.77]);
+
+print(fullfile(outputDir, 'noise_spectrum.eps'), '-depsc');
+%close(fig);
+%%
+% (c) Espectrograma do Sinal AUV
+fig = figure('Position', [100 100 1200 600], 'Color', 'w');
+
 spectrogram(x, hamming(window_length), overlap, nfft, fs, 'yaxis');
-ylim([0 1])  % Limita at√© 1 kHz
-% Ajuste din√¢mico de contraste (√∫ltimos 60 dB)
+ylim([0 1]);  % atÈ 1 kHz
 clim_max = max(get(gca,'CLim'));
-caxis([clim_max - 60, clim_max])
-% Colormap vermelho intenso -> amarelo claro
-colormap(ax3, hot)
-colorbar('FontSize', 10)
-xlabel('Time [s]', 'FontSize', 11, 'FontWeight', 'bold')
-ylabel('Frequency [kHz]', 'FontSize', 11, 'FontWeight', 'bold')
-title('AUV-like Signal Spectrogram', 'FontSize', 13, 'FontWeight', 'bold')
-set(gca, 'FontSize', 10)
+caxis([clim_max - 60, clim_max]);
+colormap(hot);
 
-% ========== COLUNA DIREITA: RU√çDO ==========
+cb = colorbar;
+ylabel(cb, 'Power/Frequency [dB/Hz]', 'FontSize', 20, 'FontWeight', 'bold');
 
-% --- Subplot 2: Espectro do Ru√≠do ---
-ax2 = axes('Position', [left_margin + plot_width + horizontal_gap, ...
-                        bottom_margin + plot_height + vertical_gap, ...
-                        plot_width, ...
-                        plot_height]);
-plot(f_fft_pos(idx_zoom), SPL_ruido(idx_zoom), 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5)
+xlabel('Time [s]', 'FontSize', 20, 'FontWeight', 'bold');
+ylabel('Frequency [kHz]', 'FontSize', 20, 'FontWeight', 'bold');
+set(gca, 'FontSize', 20);
+set(gca, 'Position', [0.08 0.15 0.78 0.82]);
+
+print(fullfile(outputDir, 'auv_spectrogram.eps'), '-depsc');
+%close(fig);
+%%
+% (d) Espectrograma do RuÌdo
+fig = figure('Position', [100 100 1200 600], 'Color', 'w');
+
+spectrogram(ruido, hamming(window_length), overlap, nfft, fs, 'yaxis');
+ylim([0 1]);
+clim_max = max(get(gca,'CLim'));
+caxis([clim_max - 60, clim_max]);
+colormap(hot);
+
+cb = colorbar;
+ylabel(cb, 'Power/Frequency [dB/Hz]', 'FontSize', 20, 'FontWeight', 'bold');
+
+xlabel('Time [s]', 'FontSize', 20, 'FontWeight', 'bold');
+ylabel('Frequency [kHz]', 'FontSize', 20, 'FontWeight', 'bold');
+set(gca, 'FontSize', 20);
+set(gca, 'Position', [0.08 0.15 0.78 0.82]);
+
+print(fullfile(outputDir, 'noise_spectrogram.eps'), '-depsc');
+%close(fig);
+
+fprintf('Spectrum and spectrogram figures (2:1) saved to: %s\n', outputDir);
+
+%% 3) Simple 2-tone signal
+f1   = 400;
+f2   = 800;
+A1   = 1.0;
+A2   = 0.7;
+phi1 = 0;
+phi2 = 0;
+t = (0:round(dur*fs)-1)'/fs;
+
+s = A1*sin(2*pi*f1*t + phi1) + A2*sin(2*pi*f2*t + phi2);
+
+%% --- Spectrum plot (Sec. 3) ---
+N     = length(s);
+S_fft = fft(s);
+S_fft = S_fft(1:floor(N/2)+1);
+f_fft = (0:floor(N/2))' * fs / N;
+
+% Calcula PSD e SPL antes do ajuste
+PSD_sinal          = (abs(S_fft).^2) / N;
+PSD_sinal(2:end-1) = 2 * PSD_sinal(2:end-1);
+SPL_sinal          = 10 * log10(PSD_sinal / (p_ref^2) + eps);
+
+% Ajusta ganho para o PICO ESPECTRAL ficar em SPL_pico_desejado
+SPL_pico_desejado = 95;                          % dB re 1 µPa
+SPL_pico_atual    = max(SPL_sinal);
+ganho_dB          = SPL_pico_desejado - SPL_pico_atual;
+ganho_lin         = 10^(ganho_dB / 20);
+
+% Aplica ganho no domÌnio do tempo e recalcula espectro
+s                  = s * ganho_lin;
+S_fft              = S_fft * ganho_lin;          % evita refazer FFT
+PSD_sinal          = (abs(S_fft).^2) / N;
+PSD_sinal(2:end-1) = 2 * PSD_sinal(2:end-1);
+SPL_sinal          = 10 * log10(PSD_sinal / (p_ref^2) + eps);
+
+fprintf('Pico espectral apos ajuste: %.1f dB re 1 uPa\n', max(SPL_sinal));
+
+% Plot
+fig      = figure('Position', [100 100 1200 600], 'Color', 'w');
+idx_zoom = f_fft <= 1000;
+
+plot(f_fft(idx_zoom), SPL_sinal(idx_zoom), 'b-', 'LineWidth', 1.5)
 grid on
-ylabel('SPL [dB re 1 \muPa]', 'FontSize', 11, 'FontWeight', 'bold')
-title('Background Noise Spectrum (Enseada dos Anjos)', 'FontSize', 13, 'FontWeight', 'bold')
+xlabel('Frequency [Hz]',      'FontSize', 20, 'FontWeight', 'bold')
+ylabel('SPL [dB re 1 \muPa]', 'FontSize', 20, 'FontWeight', 'bold')
 xlim([0 1000])
 ylim([0 100])
-set(gca, 'XTickLabel', [], 'FontSize', 10)
-
-% --- Subplot 4: Espectrograma do Ru√≠do ---
-ax4 = axes('Position', [left_margin + plot_width + horizontal_gap, ...
-                        bottom_margin, ...
-                        plot_width, ...
-                        plot_height]);
-spectrogram(ruido, hamming(window_length), overlap, nfft, fs, 'yaxis');
-ylim([0 1])  % Limita at√© 1 kHz
-% Ajuste din√¢mico de contraste
-clim_max = max(get(gca,'CLim'));
-caxis([clim_max - 60, clim_max])
-% Colormap vermelho intenso -> amarelo claro
-colormap(ax4, hot)
-colorbar('FontSize', 10)
-xlabel('Time [s]', 'FontSize', 11, 'FontWeight', 'bold')
-ylabel('Frequency [kHz]', 'FontSize', 11, 'FontWeight', 'bold')
-title('Noise Spectrogram (Enseada dos Anjos)', 'FontSize', 13, 'FontWeight', 'bold')
-set(gca, 'FontSize', 10)
-
-% Link eixos X dos espectros para zoom/pan sincronizado
-linkaxes([ax1, ax2], 'x');
+set(gca, 'FontSize', 20)
+set(gca, 'Position', [0.08 0.18 0.88 0.77])
+print(fullfile(outputDir, 'signal_spectrum.eps'), '-depsc')
+% close(fig)
 
 
+%% --- Spectrogram (Sec. 3) ---
+
+fig = figure('Position', [100 100 1200 600], 'Color', 'w');
+
+spectrogram(s, hamming(window_length), overlap, nfft, fs, 'yaxis');
+ylim([0 1]);
+
+clim_max = max(get(gca, 'CLim'));
+caxis([clim_max - 60, clim_max]);
+colormap(hot);
+
+cb = colorbar;
+ylabel(cb, 'Power/Frequency [dB/Hz]', 'FontSize', 20, 'FontWeight', 'bold');
+
+xlabel('Time [s]',        'FontSize', 20, 'FontWeight', 'bold');
+ylabel('Frequency [kHz]', 'FontSize', 20, 'FontWeight', 'bold');
+set(gca, 'FontSize', 20);
+set(gca, 'Position', [0.08 0.15 0.78 0.82]);  % same as Sec. 15
+
+print(fullfile(outputDir, 'signal_spectrogram.eps'), '-depsc');
+% close(fig);
 % =========================================================================
-%% 16. ESPECTROGRAMAS COM CONTRASTE AUTOM√ÅTICO
+%% 16. ESPECTROGRAMAS COM CONTRASTE AUTOM¡TICO
 % =========================================================================
 janela = hamming(4096);
 overlap = round(0.75*length(janela));
@@ -296,28 +370,28 @@ subplot(3, 1, 1)
 spectrogram(x , janela , overlap , nfft_spec , fs , 'yaxis');
 ylim([0 1]);
 title('Espectrograma do sinal puro');
-ylabel('Frequ√™ncia em kHz');
+ylabel('FrequÍncia em kHz');
 xlabel('Tempo em s');
 colorbar;
 
 subplot(3, 1, 2)
 spectrogram(ruido , janela , overlap , nfft_spec , fs , 'yaxis');
 ylim([0 1]);
-title('Espectrograma do ru√≠do de fundo');
-ylabel('Frequ√™ncia em kHz');
+title('Espectrograma do ruÌdo de fundo');
+ylabel('FrequÍncia em kHz');
 xlabel('Tempo em s');
 colorbar;
 
 subplot(3, 1, 3)
 spectrogram(sinal_com_ruido , janela , overlap , nfft_spec , fs , 'yaxis');
 ylim([0 1]);
-title('Espectrograma do sinal somado ao ru√≠do');
-ylabel('Frequ√™ncia em kHz');
+title('Espectrograma do sinal somado ao ruÌdo');
+ylabel('FrequÍncia em kHz');
 xlabel('Tempo em s');
 colorbar;
 
 % =========================================================================
-%% 17. REPRESENTA√á√ÉO TEMPORAL DOS TR√äS SINAIS
+%% 17. REPRESENTA«√O TEMPORAL DOS TR S SINAIS
 % =========================================================================
 t = (0:N-1)'/fs;
 
@@ -328,7 +402,7 @@ plot(t, x, 'b-', 'LineWidth', 0.4)
 grid on
 xlim([0 dur])
 ylabel('Amplitude em Pa', 'FontSize', 12, 'FontWeight', 'bold')
-title('Sinal puro sintetizado no dom√≠nio do tempo', 'FontSize', 14, 'FontWeight', 'bold')
+title('Sinal puro sintetizado no domÌnio do tempo', 'FontSize', 14, 'FontWeight', 'bold')
 set(gca, 'XTickLabel', [])
 
 subplot(3,1,2)
@@ -336,7 +410,7 @@ plot(t, ruido, 'r-', 'LineWidth', 0.4)
 grid on
 xlim([0 dur])
 ylabel('Amplitude em Pa', 'FontSize', 12, 'FontWeight', 'bold')
-title('Ru√≠do ambiental no dom√≠nio do tempo', 'FontSize', 14, 'FontWeight', 'bold')
+title('RuÌdo ambiental no domÌnio do tempo', 'FontSize', 14, 'FontWeight', 'bold')
 set(gca, 'XTickLabel', [])
 
 subplot(3,1,3)
@@ -345,6 +419,6 @@ grid on
 xlim([0 dur])
 xlabel('Tempo em s', 'FontSize', 12, 'FontWeight', 'bold')
 ylabel('Amplitude em Pa', 'FontSize', 12, 'FontWeight', 'bold')
-title('Sinal combinado para a raz√£o sinal-ru√≠do prescrita', 'FontSize', 14, 'FontWeight', 'bold')
+title('Sinal combinado para a raz„o sinal-ruÌdo prescrita', 'FontSize', 14, 'FontWeight', 'bold')
 
-
+close all
