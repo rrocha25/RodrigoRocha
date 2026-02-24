@@ -162,38 +162,6 @@ PSD_total = (abs(Y_total(1:floor(N/2)+1)).^2) / N;
 PSD_total(2:end-1) = 2 * PSD_total(2:end-1);
 SPL_total = 10 * log10(PSD_total / (p_ref^2) + eps);
 
-% -------------------------------------------------------------------------
-%% 14. PLOTAGEM COMPARATIVA
-% -------------------------------------------------------------------------
-figure('Position', [100 100 1400 900])
-idx_zoom = f_fft_pos <= 1000;
-
-subplot(3, 1, 1)
-plot(f_fft_pos(idx_zoom), SPL_sinal(idx_zoom), 'b-', 'LineWidth', 1.5)
-grid on
-ylabel('SPL [dB re 1 \muPa]', 'FontSize', 12, 'FontWeight', 'bold')
-title('Espectro do Sinal Puro (AUV)', 'FontSize', 14, 'FontWeight', 'bold')
-xlim([0 1000])
-ylim([0 100])
-set(gca, 'XTickLabel', [])
-
-subplot(3, 1, 2)
-plot(f_fft_pos(idx_zoom), SPL_ruido(idx_zoom), 'r-', 'LineWidth', 1.5)
-grid on
-ylabel('SPL [dB re 1 \muPa]', 'FontSize', 12, 'FontWeight', 'bold')
-title('Espectro do Ruído de Fundo (Enseada dos Anjos)', 'FontSize', 14, 'FontWeight', 'bold')
-xlim([0 1000])
-ylim([0 100])
-set(gca, 'XTickLabel', [])
-
-subplot(3, 1, 3)
-plot(f_fft_pos(idx_zoom), SPL_total(idx_zoom), 'k-', 'LineWidth', 1.5)
-grid on
-xlabel('Frequência [Hz]', 'FontSize', 12, 'FontWeight', 'bold')
-ylabel('SPL [dB re 1 \muPa]', 'FontSize', 12, 'FontWeight', 'bold')
-title(sprintf('Espectro do Sinal com Ruído (SNR = %.1f dB)', SNR_final), 'FontSize', 14, 'FontWeight', 'bold')
-xlim([0 1000])
-ylim([0 100])
 
 %% 15 - Espectro + Espectrograma do Sinal AUV e Ruído (figuras separadas 2:1)
 
@@ -358,67 +326,3 @@ set(gca, 'Position', [0.08 0.15 0.78 0.82]);  % same as Sec. 15
 print(fullfile(outputDir, 'signal_spectrogram.eps'), '-depsc');
 % close(fig);
 % =========================================================================
-%% 16. ESPECTROGRAMAS COM CONTRASTE AUTOMÁTICO
-% =========================================================================
-janela = hamming(4096);
-overlap = round(0.75*length(janela));
-nfft_spec = 8192;
-
-figure('Position',[100 100 1400 900])
-
-subplot(3, 1, 1)
-spectrogram(x , janela , overlap , nfft_spec , fs , 'yaxis');
-ylim([0 1]);
-title('Espectrograma do sinal puro');
-ylabel('Frequência em kHz');
-xlabel('Tempo em s');
-colorbar;
-
-subplot(3, 1, 2)
-spectrogram(ruido , janela , overlap , nfft_spec , fs , 'yaxis');
-ylim([0 1]);
-title('Espectrograma do ruído de fundo');
-ylabel('Frequência em kHz');
-xlabel('Tempo em s');
-colorbar;
-
-subplot(3, 1, 3)
-spectrogram(sinal_com_ruido , janela , overlap , nfft_spec , fs , 'yaxis');
-ylim([0 1]);
-title('Espectrograma do sinal somado ao ruído');
-ylabel('Frequência em kHz');
-xlabel('Tempo em s');
-colorbar;
-
-% =========================================================================
-%% 17. REPRESENTAÇÃO TEMPORAL DOS TRÊS SINAIS
-% =========================================================================
-t = (0:N-1)'/fs;
-
-figure('Position',[100 100 1400 900])
-
-subplot(3,1,1)
-plot(t, x, 'b-', 'LineWidth', 0.4)
-grid on
-xlim([0 dur])
-ylabel('Amplitude em Pa', 'FontSize', 12, 'FontWeight', 'bold')
-title('Sinal puro sintetizado no domínio do tempo', 'FontSize', 14, 'FontWeight', 'bold')
-set(gca, 'XTickLabel', [])
-
-subplot(3,1,2)
-plot(t, ruido, 'r-', 'LineWidth', 0.4)
-grid on
-xlim([0 dur])
-ylabel('Amplitude em Pa', 'FontSize', 12, 'FontWeight', 'bold')
-title('Ruído ambiental no domínio do tempo', 'FontSize', 14, 'FontWeight', 'bold')
-set(gca, 'XTickLabel', [])
-
-subplot(3,1,3)
-plot(t, sinal_com_ruido, 'k-', 'LineWidth', 0.4)
-grid on
-xlim([0 dur])
-xlabel('Tempo em s', 'FontSize', 12, 'FontWeight', 'bold')
-ylabel('Amplitude em Pa', 'FontSize', 12, 'FontWeight', 'bold')
-title('Sinal combinado para a razão sinal-ruído prescrita', 'FontSize', 14, 'FontWeight', 'bold')
-
-close all

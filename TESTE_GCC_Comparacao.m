@@ -7,7 +7,7 @@ c  = 1500;
 dur_s = 80e-3;
 t = (0:round(dur_s*fs)-1)' / fs;
 
-SNR_dB = 10;
+SNR_dB = -10;
 
 rng(42);
 
@@ -37,6 +37,95 @@ end
 % Standard 2:1 figure dimensions for ALL figures
 fig_width  = 1000;
 fig_height = 500;
+
+%% Plot 3D da geometria do arranjo piramidal
+figure('Position', [100 100 900 700], 'Color', 'w');
+hold on; grid on; axis equal;
+
+% Define as margens e espaçamentos para os subplots
+% Estes valores podem ser ajustados para o seu layout preferido
+left_margin = 0; % Margem esquerda da figura
+right_margin = 0; % Margem direita da figura
+bottom_margin = 0.08; % Margem inferior da figura (para a colorbar e labels)
+top_margin = 0.01; % Margem superior da figura (para o título)
+h_spacing = 0.07; % Espaçamento horizontal entre subplots
+v_spacing = 0.08; % Espaçamento vertical entre subplots
+
+
+% Calcula a posição para o único eixo
+ax_width_3d = 1 - left_margin - right_margin;
+ax_height_3d = 1 - top_margin - bottom_margin;
+set(gca, 'Position', [left_margin, bottom_margin, ax_width_3d, ax_height_3d]);
+
+
+% Calcular altura do tetraedro (apenas para uso interno no plot)
+H_calc = L * sqrt(2/3);
+
+% Plotar os 4 hidrofones
+scatter3(pos_h(:,1), pos_h(:,2), pos_h(:,3), 150, 'filled', 'MarkerFaceColor', [0 0.4470 0.7410], 'MarkerEdgeColor', 'k', 'LineWidth', 1.5);
+
+% Rotular cada hidrofone
+for k = 1:4
+    text(pos_h(k,1), pos_h(k,2), pos_h(k,3) + 0.05, sprintf('  H%d', k), ...
+        'FontSize', 20, 'FontWeight', 'bold', 'Color', 'k', 'Interpreter', 'latex');
+end
+
+% Desenhar as arestas da base (triângulo equilátero)
+base_idx = [1 2; 2 3; 3 1];
+for i = 1:size(base_idx, 1)
+    p1 = pos_h(base_idx(i,1), :);
+    p2 = pos_h(base_idx(i,2), :);
+    plot3([p1(1) p2(1)], [p1(2) p2(2)], [p1(3) p2(3)], 'k-', 'LineWidth', 1.5);
+end
+
+% Desenhar as arestas da pirâmide (do ápice para a base)
+apex_idx = [1 4; 2 4; 3 4];
+for i = 1:size(apex_idx, 1)
+    p1 = pos_h(apex_idx(i,1), :);
+    p2 = pos_h(apex_idx(i,2), :);
+    plot3([p1(1) p2(1)], [p1(2) p2(2)], [p1(3) p2(3)], 'b--', 'LineWidth', 1.2);
+end
+
+% Adicionar anotações de distâncias importantes
+% Lado da base
+mid_12 = (pos_h(1,:) + pos_h(2,:))/2;
+% text(mid_12(1), mid_12(2), mid_12(3) - 0.05, sprintf('$L = %.3f$ m', L), ...
+%     'FontSize', 18, 'Color', 'k', 'Interpreter', 'latex');
+
+% Comprimento de onda mínimo
+% text(0.1, 0.1, 0.05, sprintf('$\\lambda_{\\mathrm{min}}/2 = %.3f$ m', lambda_min/2), ...
+%     'FontSize', 18, 'Color', 'b', 'Interpreter', 'latex');
+
+% Distância máxima entre pares
+text(0.1, 0.1, H_calc + 0.15, sprintf('$d_{\\mathrm{max}} = %.3f$ m', L), ...
+    'FontSize', 20, 'Color', [0 0.5 0], 'Interpreter', 'latex', 'FontWeight', 'bold');
+
+% Configurações dos eixos
+xlabel('$x$ (m)', 'Interpreter', 'latex', 'FontSize', 20);
+ylabel('$y$ (m)', 'Interpreter', 'latex', 'FontSize', 20);
+zlabel('$z$ (m)', 'Interpreter', 'latex', 'FontSize', 20);
+
+% Ajustar visualização
+view(45, 30);  % Ângulo de visão 3D
+xlim([-0.1 L+0.1]);
+ylim([-0.1 L*sqrt(3)/2 + 0.1]);
+zlim([0 H_calc + 0.2]);
+set(gca, 'FontSize', 20);
+box on;
+
+% Adicionar legenda
+legend({'Hydrophones', 'Base edges', 'Tetrahedron edges'}, ...
+    'Location', 'best', 'Interpreter', 'latex', 'FontSize', 20);
+
+hold off;
+
+% Output directory for figures
+outputDir = './figures';
+if ~exist(outputDir, 'dir')
+    mkdir(outputDir);
+end
+print(fullfile(outputDir, 'array.eps'), '-depsc')
+
 
 %% 2) Physical maxLag
 dmax          = max_pair_distance(pos_h);
@@ -152,16 +241,16 @@ for k = 1:4
     ylim(yl);
     xlim([30 50]);
 
-    legend([h_ref h_exp], {sprintf('Ref: %.2f ms', t_ref_ms), ...
-                           sprintf('Exp: %.2f ms', t_del_ms)}, ...
-          'Location', 'northeast', 'Interpreter', 'none', 'FontSize', 20);
+    legend([h_ref h_exp], { ...
+        sprintf('Ref: %.2f ms', t_ref_ms), ...
+        sprintf('Exp: %.2f ms  (\\tau_{%d} = %.3f ms)', t_del_ms, k, 1e3*tau_rel(k))}, ...
+        'Location', 'northeast', 'Interpreter', 'tex', 'FontSize', 20);
 
     set(gca, 'FontSize', 20);
     set(gca, 'Position', [0.08 0.18 0.90 0.75])
     hold off
-
+    fprintf('H%d: %.6f ms\n', k, 1e3*tau_rel(k));
     print(fullfile(outputDir, sprintf('channel_%d.eps', k)), '-depsc')
-    %close(fig)
 end
 
 %% 5) Estimate TDOAs and plot correlations - FORMATO 2:1
@@ -200,8 +289,11 @@ for p = 1:Np
     xlabel('Delay [ms]', 'FontSize', 20, 'FontWeight', 'bold');
     ylabel(sprintf('Corr. (%d,%d)', i, j), 'FontSize', 20, 'FontWeight', 'bold');
 
-    legend([h_hat h_the h_pk], {'Est.', 'Theor.', 'Peak'}, ...
-        'Location', 'best', 'Interpreter', 'none', 'FontSize', 20);
+    legend([h_hat h_the h_pk], { ...
+        sprintf('Est.   \\tau_{%d%d} = %.3f ms', i, j, 1e3*tdoa_phat(p)), ...
+        sprintf('Theor. \\tau_{%d%d} = %.3f ms', i, j, 1e3*tdoa_th_plane(p)), ...
+        'Peak'}, ...
+        'Location', 'best', 'Interpreter', 'tex', 'FontSize', 20);
 
     set(gca, 'FontSize', 20);
     set(gca, 'Position', [0.08 0.18 0.90 0.75])
@@ -229,8 +321,11 @@ for p = 1:Np
     xlabel('Delay [ms]', 'FontSize', 20, 'FontWeight', 'bold');
     ylabel(sprintf('Corr. (%d,%d)', i, j), 'FontSize', 20, 'FontWeight', 'bold');
 
-    legend([h_hat h_the h_pk], {'Est.', 'Theor.', 'Peak'}, ...
-        'Location', 'best', 'Interpreter', 'none', 'FontSize', 20);
+    legend([h_hat h_the h_pk], { ...
+        sprintf('Est.   \\tau_{%d%d} = %.3f ms', i, j, 1e3*tdoa_gcc(p)), ...
+        sprintf('Theor. \\tau_{%d%d} = %.3f ms', i, j, 1e3*tdoa_th_plane(p)), ...
+        'Peak'}, ...
+        'Location', 'best', 'Interpreter', 'tex', 'FontSize', 20);
 
     set(gca, 'FontSize', 20);
     set(gca, 'Position', [0.08 0.18 0.90 0.75])
